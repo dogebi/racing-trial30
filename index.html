@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>30초 트라이얼</title>
+<style>
+  html,body{margin:0;padding:0;background:#07090f;overflow:hidden;height:100%;
+    font-family:"Segoe UI",AppleSDGothicNeo,Malgun Gothic,sans-serif;color:#dfe8ff;
+    -webkit-user-select:none;user-select:none}
+  #app{position:fixed;inset:0}
+  canvas{display:block}
+  /* ---------- overlays ---------- */
+  .layer{position:absolute;inset:0;pointer-events:none}
+  /* HUD */
+  #hud{display:none}
+  #timer{position:absolute;top:14px;left:50%;transform:translateX(-50%);
+    font-size:64px;font-weight:800;letter-spacing:2px;font-variant-numeric:tabular-nums;
+    color:#fff;text-shadow:0 0 18px rgba(80,160,255,.55),0 2px 4px rgba(0,0,0,.8);line-height:1}
+  #timer.low{color:#ffd257}
+  #diff{position:absolute;top:86px;left:50%;transform:translateX(-50%);
+    font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;
+    text-shadow:0 1px 3px rgba(0,0,0,.8)}
+  #trackname{position:absolute;top:16px;left:18px;font-size:20px;font-weight:700;
+    text-shadow:0 1px 3px rgba(0,0,0,.8)}
+  #bestline{position:absolute;top:44px;left:18px;font-size:15px;color:#9fb4d8}
+  #attempts{position:absolute;top:16px;right:18px;font-size:16px;color:#9fb4d8;
+    text-align:right;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+  #speed{position:absolute;bottom:22px;right:26px;font-size:44px;font-weight:800;
+    text-shadow:0 1px 4px rgba(0,0,0,.8)}
+  #speed small{font-size:16px;font-weight:600;color:#9fb4d8}
+  #rhint{position:absolute;bottom:24px;left:26px;font-size:14px;color:#7d90b5}
+  #boostbar{position:absolute;bottom:78px;right:26px;width:150px;height:6px;
+    background:rgba(255,255,255,.12);border-radius:3px;overflow:hidden;display:none}
+  #boostfill{height:100%;width:0%;background:linear-gradient(90deg,#3aa0ff,#8ff0ff)}
+  /* finish / death popups */
+  #finish{position:absolute;top:34%;left:50%;transform:translate(-50%,-50%);
+    text-align:center;display:none}
+  #finish .big{font-size:46px;font-weight:900;letter-spacing:3px;color:#8ff0ff;
+    text-shadow:0 0 24px rgba(120,220,255,.8)}
+  #finish .time{font-size:58px;font-weight:900;color:#fff;margin-top:6px}
+  #finish .sub{font-size:20px;color:#ffd257;margin-top:6px;min-height:26px}
+  #newrecord{position:absolute;top:24%;left:50%;transform:translate(-50%,-50%) scale(.6);
+    font-size:54px;font-weight:900;color:#ffd257;letter-spacing:4px;opacity:0;
+    text-shadow:0 0 30px rgba(255,190,60,.9);white-space:nowrap}
+  #newrecord.anim{animation:nr 1.6s ease-out forwards}
+  @keyframes nr{0%{opacity:0;transform:translate(-50%,-50%) scale(.5) rotate(-6deg)}
+    18%{opacity:1;transform:translate(-50%,-50%) scale(1.15) rotate(2deg)}
+    30%{transform:translate(-50%,-50%) scale(1) rotate(0deg)}
+    75%{opacity:1}100%{opacity:0;transform:translate(-50%,-56%) scale(1)}}
+  /* vignette + speed lines are canvas layers */
+  #fx{position:absolute;inset:0;mix-blend-mode:screen}
+  /* ---------- track select / start overlay ---------- */
+  #menu{position:absolute;inset:0;pointer-events:auto;display:flex;
+    flex-direction:column;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at 50% 30%,#0e1a33 0%,#07090f 70%)}
+  #menu h1{font-size:52px;font-weight:900;letter-spacing:6px;margin:0 0 4px;
+    color:#fff;text-shadow:0 0 30px rgba(90,170,255,.6)}
+  #menu .tag{color:#8fa5cc;margin:0 0 28px;font-size:16px}
+  #cards{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;max-width:900px}
+  .card{pointer-events:auto;cursor:pointer;width:250px;padding:14px 16px;border-radius:12px;
+    background:rgba(20,32,58,.85);border:1px solid #2a3d66;transition:.12s;text-align:left}
+  .card:hover{transform:translateY(-4px);border-color:#5aa0ff;
+    box-shadow:0 8px 26px rgba(60,140,255,.28)}
+  .card .key{display:inline-block;width:24px;height:24px;line-height:24px;text-align:center;
+    border-radius:5px;background:#2a3d66;font-weight:800;font-size:14px;margin-right:8px}
+  .card .nm{font-size:19px;font-weight:800}
+  .card .idea{font-size:13px;color:#8fa5cc;margin-top:7px;min-height:34px}
+  .card .bt{font-size:15px;font-weight:700;color:#ffd257;margin-top:6px;font-variant-numeric:tabular-nums}
+  .card .no{color:#5c6f95;font-weight:500}
+  #menu .help{margin-top:30px;color:#8fa5cc;font-size:14px;line-height:1.9;text-align:center}
+  #menu .help b{color:#dfe8ff;background:rgba(255,255,255,.08);padding:1px 7px;border-radius:4px}
+  #audiobtn{pointer-events:auto;position:absolute;bottom:14px;right:16px;font-size:13px;
+    color:#8fa5cc;cursor:pointer;background:none;border:1px solid #2a3d66;border-radius:6px;
+    padding:4px 10px}
+  #hidden{display:none}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="menu" class="layer">
+  <h1>30초 트라이얼</h1>
+  <p class="tag">죽으면 0.5초 만에 리스타트 — 당신의 고스트를 이겨라</p>
+  <div id="cards"></div>
+  <div class="help">
+    <b>W A S D / 화살표</b> 주작 &nbsp; <b>Space</b> 핸드브레이크 &nbsp; <b>R</b> 즉시 재시작 &nbsp;
+    <b>Esc</b> 트랙 선택<br>
+    1~5 키로 트랙 선택 · 기록과 고스트는 브라우저에 저장됩니다
+  </div>
+  <button id="audiobtn">소리: 켜짐</button>
+</div>
+
+<div id="hud" class="layer">
+  <div id="trackname"></div>
+  <div id="bestline"></div>
+  <div id="attempts"></div>
+  <div id="timer">0.000</div>
+  <div id="diff"></div>
+  <div id="finish"><div class="big">FINISH</div><div class="time"></div><div class="sub"></div></div>
+  <div id="newrecord">NEW RECORD</div>
+  <div id="speed">0<small> km/h</small></div>
+  <div id="boostbar"><div id="boostfill"></div></div>
+  <div id="rhint">R = 재시작 · Esc = 트랙 선택</div>
+  <canvas id="fx"></canvas>
+</div>
+
+<!-- Three.js: fixed version, classic non-module global build -->
+<script src="vendor/three.min.js"></script>
+<script>
+  if (typeof THREE === 'undefined') {
+    document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"><\/script>');
+  }
+</script>
+<script src="js/util.js"></script>
+<script src="js/tracks.js"></script>
+<script src="js/physics.js"></script>
+<script src="js/ghost.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/world.js"></script>
+<script src="js/hud.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
